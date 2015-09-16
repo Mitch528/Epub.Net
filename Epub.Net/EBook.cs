@@ -57,7 +57,6 @@ namespace Epub.Net
         {
             OpfFile opf = new OpfFile(new OpfMetadata
             {
-                Identifier = Title,
                 Title = Title,
                 Language = Language
             });

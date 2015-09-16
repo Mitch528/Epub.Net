@@ -20,7 +20,7 @@ namespace Epub.Net.Opf
 
         public OpfMetadata()
         {
-            Identifier = string.Empty;
+            Identifier = Guid.NewGuid().ToString();
             Title = string.Empty;
             Creator = string.Empty;
             Language = string.Empty;

@@ -70,7 +70,7 @@ namespace Epub.Net.Opf
             Document = new XDocument(
                 new XElement(XMLNS + "package",
                     new XAttribute("version", "3.0"),
-                    new XAttribute("unique-identifier", "id"),
+                    new XAttribute("unique-identifier", "uid"),
                     _metadata,
                     _manifest,
                     _spine
