@@ -1,0 +1,14 @@
+﻿@using System.Collections.Generic
+@using Epub.Net.Razor
+@using Epub.Net.Models
+@inherits HtmlSupportTemplateBase<IEnumerable<Section>>
+
+<ol>
+    @foreach (Section sec in Model)
+    {
+        <li>
+            <a href="@sec.Href">@sec.Name</a>
+            @Html.Partial("Epub.Net.Templates._TableOfContentsSections.cshtml", sec.SubSections)
+        </li>
+    }
+</ol>
