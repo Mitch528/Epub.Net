@@ -127,8 +127,12 @@ namespace Epub.Net
                 OpfItem item = new OpfItem(chapter.FileName, chapter.Name.ToLower().Replace(" ", "-"), MediaType.XHtmlType);
                 opf.AddItem(item);
 
+                HtmlDocument doc = new HtmlDocument { OptionWriteEmptyNodes = true };
+                doc.LoadHtml(chapter.Content);
+                chapter.Content = doc.DocumentNode.OuterHtml;
+
                 File.WriteAllText(Path.Combine(epub, chapter.FileName),
-                    RazorCompiler.Get(Templates[EBookTemplate.Chapter], "chapter", chapter));
+                        RazorCompiler.Get(Templates[EBookTemplate.Chapter], "chapter", chapter));
             }
 
             opf.Save(Path.Combine(epub, "package.opf"));
@@ -136,14 +140,21 @@ namespace Epub.Net
             if (File.Exists(epubDest))
                 File.Delete(epubDest);
 
-            ZipFile.CreateFromDirectory(tmpDir, epubDest);
+            using (FileStream fs = new FileStream(epubDest, FileMode.CreateNew))
+            using (ZipArchive za = new ZipArchive(fs, ZipArchiveMode.Create))
+            {
+                za.CreateEntryFromFile(Path.Combine(tmpDir, "mimetype"), "mimetype", CompressionLevel.NoCompression);
+
+                Zip(za, epub, "EPUB");
+                Zip(za, metaInf, "META-INF");
+            }
 
             Directory.Delete(tmpDir, true);
         }
 
         protected virtual void EmbedImages(OpfFile opfFile, Chapter chapter, string outputDir)
         {
-            HtmlDocument doc = new HtmlDocument();
+            HtmlDocument doc = new HtmlDocument { OptionWriteEmptyNodes = true };
             doc.LoadHtml(chapter.Content);
 
             using (HttpClient client = new HttpClient())
@@ -173,7 +184,7 @@ namespace Epub.Net
                     {
                         try
                         {
-                            HttpResponseMessage resp = client.GetAsync(src).Result;   
+                            HttpResponseMessage resp = client.GetAsync(src).Result;
                             resp.EnsureSuccessStatusCode();
 
                             string mediaType = resp.Content.Headers.ContentType.MediaType.ToLower();
@@ -216,6 +227,19 @@ namespace Epub.Net
             }
 
             chapter.Content = doc.DocumentNode.OuterHtml;
+        }
+
+        private static void Zip(ZipArchive archive, string dir, string dest)
+        {
+            foreach (FileInfo f in new DirectoryInfo(dir).GetFiles())
+            {
+                archive.CreateEntryFromFile(f.FullName, Path.Combine(dest, f.Name).Replace(@"\", "/"));
+            }
+
+            foreach (DirectoryInfo d in new DirectoryInfo(dir).GetDirectories())
+            {
+                Zip(archive, d.FullName, Path.Combine(dest, d.Name));
+            }
         }
     }
 }
