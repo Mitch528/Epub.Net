@@ -12,6 +12,7 @@ using Epub.Net.Extensions;
 using Epub.Net.Models;
 using Epub.Net.Opf;
 using Epub.Net.Razor;
+using Epub.Net.Utils;
 using HtmlAgilityPack;
 
 namespace Epub.Net
@@ -124,12 +125,12 @@ namespace Epub.Net
                 if (options.EmbedImages)
                     EmbedImages(opf, chapter, Path.Combine(epub, "images"));
 
-                OpfItem item = new OpfItem(chapter.FileName, chapter.Name.ToLower().Replace(" ", "-"), MediaType.XHtmlType);
+                OpfItem item = new OpfItem(chapter.FileName, chapter.Name.ReplaceInvalidChars(), MediaType.XHtmlType);
                 opf.AddItem(item);
 
-                HtmlDocument doc = new HtmlDocument { OptionWriteEmptyNodes = true };
+                HtmlDocument doc = new HtmlDocument { OptionOutputAsXml = true };
                 doc.LoadHtml(chapter.Content);
-                chapter.Content = doc.DocumentNode.OuterHtml;
+                chapter.Content = doc.DocumentNode.InnerHtml;
 
                 File.WriteAllText(Path.Combine(epub, chapter.FileName),
                         RazorCompiler.Get(Templates[EBookTemplate.Chapter], "chapter", chapter));
@@ -154,7 +155,7 @@ namespace Epub.Net
 
         protected virtual void EmbedImages(OpfFile opfFile, Chapter chapter, string outputDir)
         {
-            HtmlDocument doc = new HtmlDocument { OptionWriteEmptyNodes = true };
+            HtmlDocument doc = new HtmlDocument { OptionOutputAsXml = true };
             doc.LoadHtml(chapter.Content);
 
             using (HttpClient client = new HttpClient())
@@ -167,13 +168,16 @@ namespace Epub.Net
                 foreach (HtmlNode imgNode in imageNodes)
                 {
                     string src = imgNode.Attributes["src"].Value;
-                    string fileName = Path.GetFileName(src);
+                    string fileName = Path.GetFileNameWithoutExtension(src)?.ReplaceInvalidChars();
 
                     if (string.IsNullOrEmpty(fileName))
                         continue;
 
+                    string fileExt = Path.GetExtension(fileName);
+                    fileName += fileExt;
+
                     if (fileName.HasInvalidPathChars())
-                        fileName = Path.GetRandomFileName();
+                        fileName = fileName.ToValidFilePath();
 
                     string path = Path.Combine(outputDir, fileName);
 
@@ -221,12 +225,12 @@ namespace Epub.Net
                     string filePath = Path.Combine(new DirectoryInfo(outputDir).Name, Path.GetFileName(path)).Replace(@"\", "/");
                     imgNode.SetAttributeValue("src", filePath);
 
-                    opfFile.AddItem(new OpfItem(filePath, Path.GetFileNameWithoutExtension(path),
+                    opfFile.AddItem(new OpfItem(filePath, StringUtilities.GenerateRandomString(),
                         mType), false);
                 }
             }
 
-            chapter.Content = doc.DocumentNode.OuterHtml;
+            chapter.Content = doc.DocumentNode.InnerHtml;
         }
 
         private static void Zip(ZipArchive archive, string dir, string dest)

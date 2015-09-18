@@ -68,11 +68,14 @@
     <Compile Include="Opf\OpfItem.cs" />
     <Compile Include="Opf\OpfMeta.cs" />
     <Compile Include="Opf\OpfMetadata.cs" />
+    <Compile Include="Opf\OpfMetadataDirection.cs" />
+    <Compile Include="Opf\OpfMetadataElement.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Razor\HtmlHelper.cs" />
     <Compile Include="Razor\HtmlSupportTemplateBase.cs" />
     <Compile Include="Razor\RazorCompiler.cs" />
     <Compile Include="RootFile.cs" />
+    <Compile Include="Utils\StringUtilities.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

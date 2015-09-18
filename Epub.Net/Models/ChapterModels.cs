@@ -9,10 +9,10 @@ namespace Epub.Net.Models
 {
     public class Chapter
     {
-        public string FileName => $"{Name.ToLower().Replace(" ", "-")}.xhtml".ToValidFilePath();
+        public string FileName => $"{Name.ReplaceInvalidChars()}.xhtml";
 
         public string Name { get; set; }
-        
+
         public string Content { get; set; }
     }
 }

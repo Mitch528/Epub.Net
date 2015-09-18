@@ -9,13 +9,22 @@ namespace Epub.Net.Opf
 {
     public class OpfItem
     {
-        public XElement ItemElement =>
-            new XElement(OpfFile.XMLNS + "item",
-                new XAttribute("href", Href),
-                new XAttribute("id", Id),
-                new XAttribute("media-type", MediaType.ToString()),
-                new XAttribute("properties", Properties)
-            );
+        public XElement ItemElement
+        {
+            get
+            {
+                XElement element = new XElement(OpfFile.XMLNS + "item",
+                    new XAttribute("href", Href),
+                    new XAttribute("id", Id),
+                    new XAttribute("media-type", MediaType.ToString())
+                );
+
+                if (!string.IsNullOrEmpty(Properties))
+                    element.Add(new XAttribute("properties", Properties));
+
+                return element;
+            }
+        }
 
         public XElement SpineElement =>
             new XElement(OpfFile.XMLNS + "itemref",

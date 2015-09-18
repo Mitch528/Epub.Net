@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Xml;
 using System.Xml.Linq;
@@ -37,33 +38,7 @@ namespace Epub.Net.Opf
 
         private void Init(OpfMetadata metadata)
         {
-            _metadata = new XElement(XMLNS + "metadata",
-                            new XAttribute(XNamespace.Xmlns + "dc", DC),
-                            new XElement(DC + "identifier",
-                                new XAttribute("id", "uid"),
-                                new XText(metadata.Identifier)
-                            ),
-                            new XElement(DC + "title",
-                                new XText(metadata.Title)
-                            ),
-                            new XElement(DC + "creator",
-                                new XText(metadata.Creator)
-                            ),
-                            new XElement(DC + "language",
-                                new XText(metadata.Language)
-                            )
-                        );
-
-            _metadata.Add(metadata.Meta.Select(p =>
-                new XElement("meta",
-                    new XAttribute("property", p.Property),
-                    new XAttribute("refines", p.Refines),
-                    new XAttribute("id", p.Id),
-                    new XAttribute("scheme", p.Scheme),
-                    new XText(p.Text)
-                )
-            ));
-
+            _metadata = CreateMetadata(metadata);
             _manifest = new XElement(XMLNS + "manifest");
             _spine = new XElement(XMLNS + "spine");
 
@@ -78,12 +53,18 @@ namespace Epub.Net.Opf
             );
         }
 
-        public void AddItem(OpfItem item, bool addToSpine = true)
+        public bool AddItem(OpfItem item, bool addToSpine = true)
         {
+            if (_manifest.Descendants().Any(p => p.Attribute("id")?.Value == item.Id)
+                    || _manifest.Descendants().Any(p => p.Attribute("href")?.Value == item.Href))
+                return false;
+
             _manifest.Add(item.ItemElement);
 
             if (addToSpine)
                 _spine.Add(item.SpineElement);
+
+            return true;
         }
 
         public void RemoveItem(OpfItem item)
@@ -111,6 +92,61 @@ namespace Epub.Net.Opf
                 writer.Flush();
 
                 return sWriter.ToString();
+            }
+        }
+
+        private XElement CreateMetadata(OpfMetadata metadata)
+        {
+            XElement element = new XElement(XMLNS + "metadata",
+                            new XAttribute(XNamespace.Xmlns + "dc", DC),
+                            new XElement(DC + "identifier",
+                                new XAttribute("id", "uid"),
+                                new XText(metadata.Identifier)
+                            ),
+                            new XElement(DC + "title",
+                                new XText(metadata.Title)
+                            ),
+                            new XElement(DC + "language",
+                                new XText(metadata.Language)
+                            )
+                        );
+
+            element.Add(CreateMetadataElements(
+                metadata.Contributor, metadata.Coverage, metadata.Creator, metadata.Date, metadata.Description, 
+                metadata.Format, metadata.Publisher, metadata.Relation, metadata.Rights, metadata.Source, metadata.Subject,
+                metadata.Type
+            ).Cast<object>().ToArray());
+
+            element.Add(metadata.Meta.Select(p =>
+                new XElement("meta",
+                    new XAttribute("property", p.Property),
+                    new XAttribute("refines", p.Refines),
+                    new XAttribute("id", p.Id),
+                    new XAttribute("scheme", p.Scheme),
+                    new XText(p.Text)
+                )
+            ));
+
+            return element;
+        }
+
+        private static IEnumerable<XElement> CreateMetadataElements(params OpfMetadataElement[] elements)
+        {
+            foreach (OpfMetadataElement element in elements)
+            {
+                if (string.IsNullOrEmpty(element.Text))
+                    continue;
+
+                XElement mElement = new XElement(DC + element.Name, new XText(element.Text));
+
+                if (!string.IsNullOrEmpty(element.Id))
+                    mElement.Add(new XAttribute("id", element.Id));
+                if (!string.IsNullOrEmpty(element.Language))
+                    mElement.Add(new XAttribute("language", element.Language));
+                if (element.Direction != null)
+                    mElement.Add(new XAttribute("direction", element.Direction));
+
+                yield return mElement;
             }
         }
     }
