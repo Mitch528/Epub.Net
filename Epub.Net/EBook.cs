@@ -52,10 +52,20 @@ namespace Epub.Net
 
         public void GenerateEpub(string epubDest)
         {
-            GenerateEpub(epubDest, DefaultGenerateOptions);
+            GenerateEpubAsync(epubDest).Wait();
         }
 
         public void GenerateEpub(string epubDest, GenerateOptions options)
+        {
+            GenerateEpubAsync(epubDest, options).Wait();
+        }
+
+        public Task GenerateEpubAsync(string epubDest)
+        {
+            return GenerateEpubAsync(epubDest, DefaultGenerateOptions);
+        }
+
+        public async Task GenerateEpubAsync(string epubDest, GenerateOptions options)
         {
             OpfFile opf = new OpfFile(new OpfMetadata
             {
@@ -124,7 +134,7 @@ namespace Epub.Net
             foreach (Chapter chapter in Chapters)
             {
                 if (options.EmbedImages)
-                    EmbedImages(opf, chapter, Path.Combine(epub, "images"));
+                    await EmbedImagesAsync(opf, chapter, Path.Combine(epub, "images"));
 
                 OpfItem item = new OpfItem(chapter.FileName, chapter.Name.ReplaceInvalidChars(), MediaType.XHtmlType);
                 opf.AddItem(item);
@@ -154,20 +164,21 @@ namespace Epub.Net
             Directory.Delete(tmpDir, true);
         }
 
-        protected virtual void EmbedImages(OpfFile opfFile, Chapter chapter, string outputDir)
+        protected virtual async Task EmbedImagesAsync(OpfFile opfFile, Chapter chapter, string outputDir)
         {
             HtmlParser parser = new HtmlParser();
-            var doc = parser.Parse(chapter.Content);
-            
-            using (HttpClient client = new HttpClient())
+            var doc = await parser.ParseAsync(chapter.Content);
+            var tasks = new List<Task>();
+
+            foreach (var img in doc.QuerySelectorAll("img"))
             {
-                foreach (var img in doc.QuerySelectorAll("img"))
+                tasks.Add(Task.Run(async () =>
                 {
                     string src = img.GetAttribute("src");
                     string fileName = Path.GetFileNameWithoutExtension(src)?.ReplaceInvalidChars();
 
                     if (string.IsNullOrEmpty(fileName))
-                        continue;
+                        return;
 
                     string fileExt = Path.GetExtension(fileName);
                     fileName += fileExt;
@@ -178,34 +189,40 @@ namespace Epub.Net
                     string path = Path.Combine(outputDir, fileName);
 
                     if (File.Exists(path))
-                        continue;
+                        return;
 
                     if (!new Uri(src).IsFile)
                     {
                         try
                         {
-                            HttpResponseMessage resp = client.GetAsync(src).Result;
-                            resp.EnsureSuccessStatusCode();
+                            using (HttpClient client = new HttpClient())
+                            {
+                                HttpResponseMessage resp = client.GetAsync(src).Result;
+                                resp.EnsureSuccessStatusCode();
 
-                            string mediaType = resp.Content.Headers.ContentType.MediaType.ToLower();
-                            string ext;
+                                string mediaType = resp.Content.Headers.ContentType.MediaType.ToLower();
+                                string ext;
 
-                            if (mediaType == MediaType.JpegType)
-                                ext = ".jpg";
-                            else if (mediaType == MediaType.PngType)
-                                ext = ".png";
-                            else
-                                continue;
+                                if (mediaType == MediaType.JpegType)
+                                    ext = ".jpg";
+                                else if (mediaType == MediaType.PngType)
+                                    ext = ".png";
+                                else
+                                    return;
 
-                            if (Path.GetExtension(path) != ext)
-                                path = path + ext;
+                                if (Path.GetExtension(path) != ext)
+                                    path = path + ext;
 
-                            byte[] fileData = resp.Content.ReadAsByteArrayAsync().Result;
-                            File.WriteAllBytes(path, fileData);
+                                if (File.Exists(path))
+                                    return;
+
+                                using (FileStream fs = new FileStream(path, FileMode.CreateNew))
+                                    await resp.Content.CopyToAsync(fs);
+                            }
                         }
                         catch (Exception)
                         {
-                            continue;
+                            return;
                         }
                     }
                     else if (File.Exists(src))
@@ -216,15 +233,17 @@ namespace Epub.Net
                     MediaType mType = MediaType.FromExtension(Path.GetExtension(path));
 
                     if (mType == null)
-                        continue;
+                        return;
 
                     string filePath = Path.Combine(new DirectoryInfo(outputDir).Name, Path.GetFileName(path)).Replace(@"\", "/");
                     img.SetAttribute("src", filePath);
 
                     opfFile.AddItem(new OpfItem(filePath, StringUtilities.GenerateRandomString(),
                         mType), false);
-                }
+                }));
             }
+
+            await Task.WhenAll(tasks.ToArray());
 
             chapter.Content = doc.QuerySelector("body").ChildNodes.ToHtml(new XmlMarkupFormatter());
         }

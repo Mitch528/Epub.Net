@@ -20,6 +20,8 @@ namespace Epub.Net.Opf
         private XElement _manifest;
         private XElement _spine;
 
+        private readonly object _locker = new object();
+
         public XDocument Document { get; private set; }
 
         public OpfFile(OpfMetadata metadata)
@@ -55,22 +57,28 @@ namespace Epub.Net.Opf
 
         public bool AddItem(OpfItem item, bool addToSpine = true)
         {
-            if (_manifest.Descendants().Any(p => p.Attribute("id")?.Value == item.Id)
-                    || _manifest.Descendants().Any(p => p.Attribute("href")?.Value == item.Href))
-                return false;
+            lock(_locker)
+            {
+                if (_manifest.Descendants().Any(p => p.Attribute("id")?.Value == item.Id)
+                        || _manifest.Descendants().Any(p => p.Attribute("href")?.Value == item.Href))
+                    return false;
 
-            _manifest.Add(item.ItemElement);
+                _manifest.Add(item.ItemElement);
 
-            if (addToSpine)
-                _spine.Add(item.SpineElement);
+                if (addToSpine)
+                    _spine.Add(item.SpineElement);
+            }
 
             return true;
         }
 
         public void RemoveItem(OpfItem item)
         {
-            _manifest.Descendants().SingleOrDefault(p => p.Name == "item" && p.Attribute("id")?.Value == item.Id)?.Remove();
-            _spine.Descendants().SingleOrDefault(p => p.Name == "itemref" && p.Attribute("idref")?.Value == item.Id)?.Remove();
+            lock(_locker)
+            {
+                _manifest.Descendants().SingleOrDefault(p => p.Name == "item" && p.Attribute("id")?.Value == item.Id)?.Remove();
+                _spine.Descendants().SingleOrDefault(p => p.Name == "itemref" && p.Attribute("idref")?.Value == item.Id)?.Remove();
+            }
         }
 
         public void Save(string dest)

@@ -9,7 +9,7 @@ namespace Epub.Net.Models
 {
     public class Chapter
     {
-        public string FileName => $"{Name.ReplaceInvalidChars()}.xhtml";
+        public string FileName => $"chapter_{Name.ReplaceInvalidChars()}.xhtml";
 
         public string Name { get; set; }
 
