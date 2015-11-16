@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using AngleSharp.Dom.Html;
 using AngleSharp.Parser.Html;
 using AngleSharp.Xml;
 using Epub.Net.Extensions;
@@ -131,17 +132,19 @@ namespace Epub.Net
             OpfItem navItem = new OpfItem("toc.xhtml", "toc", MediaType.XHtmlType) { Properties = "nav" };
             opf.AddItem(navItem);
 
+            var parser = new HtmlParser();
+
             foreach (Chapter chapter in Chapters)
             {
+                var doc = parser.Parse(chapter.Content);
+
                 if (options.EmbedImages)
-                    await EmbedImagesAsync(opf, chapter, Path.Combine(epub, "images"));
+                    await EmbedImagesAsync(doc, opf, chapter, Path.Combine(epub, "images"));
+                else
+                    chapter.Content = doc.QuerySelector("body").ChildNodes.ToHtml(new XmlMarkupFormatter());
 
                 OpfItem item = new OpfItem(chapter.FileName, chapter.Name.ReplaceInvalidChars(), MediaType.XHtmlType);
                 opf.AddItem(item);
-
-                var parser = new HtmlParser();
-                var doc = parser.Parse(chapter.Content);
-                chapter.Content = doc.QuerySelector("body").ChildNodes.ToHtml(new XmlMarkupFormatter());
 
                 File.WriteAllText(Path.Combine(epub, chapter.FileName),
                         RazorCompiler.Get(Templates[EBookTemplate.Chapter], "chapter", chapter));
@@ -164,10 +167,8 @@ namespace Epub.Net
             Directory.Delete(tmpDir, true);
         }
 
-        protected virtual async Task EmbedImagesAsync(OpfFile opfFile, Chapter chapter, string outputDir)
+        protected virtual async Task EmbedImagesAsync(IHtmlDocument doc, OpfFile opfFile, Chapter chapter, string outputDir)
         {
-            HtmlParser parser = new HtmlParser();
-            var doc = await parser.ParseAsync(chapter.Content);
             var tasks = new List<Task>();
 
             foreach (var img in doc.QuerySelectorAll("img"))
@@ -191,7 +192,11 @@ namespace Epub.Net
                     if (File.Exists(path))
                         return;
 
-                    if (!new Uri(src).IsFile)
+                    Uri uri;
+                    if (!Uri.TryCreate(src, UriKind.RelativeOrAbsolute, out uri))
+                        return;
+
+                    if (!uri.IsFile)
                     {
                         try
                         {
