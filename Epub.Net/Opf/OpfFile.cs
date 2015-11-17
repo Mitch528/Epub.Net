@@ -57,7 +57,7 @@ namespace Epub.Net.Opf
 
         public bool AddItem(OpfItem item, bool addToSpine = true)
         {
-            lock(_locker)
+            lock (_locker)
             {
                 if (_manifest.Descendants().Any(p => p.Attribute("id")?.Value == item.Id)
                         || _manifest.Descendants().Any(p => p.Attribute("href")?.Value == item.Href))
@@ -74,7 +74,7 @@ namespace Epub.Net.Opf
 
         public void RemoveItem(OpfItem item)
         {
-            lock(_locker)
+            lock (_locker)
             {
                 _manifest.Descendants().SingleOrDefault(p => p.Name == "item" && p.Attribute("id")?.Value == item.Id)?.Remove();
                 _spine.Descendants().SingleOrDefault(p => p.Name == "itemref" && p.Attribute("idref")?.Value == item.Id)?.Remove();
@@ -107,20 +107,13 @@ namespace Epub.Net.Opf
         {
             XElement element = new XElement(XMLNS + "metadata",
                             new XAttribute(XNamespace.Xmlns + "dc", DC),
-                            new XElement(DC + "identifier",
+                            new XElement(DC + metadata.Identifier.Name,
                                 new XAttribute("id", "uid"),
-                                new XText(metadata.Identifier)
-                            ),
-                            new XElement(DC + "title",
-                                new XText(metadata.Title)
-                            ),
-                            new XElement(DC + "language",
-                                new XText(metadata.Language)
-                            )
-                        );
+                                new XText(metadata.Identifier.Text)));
 
             element.Add(CreateMetadataElements(
-                metadata.Contributor, metadata.Coverage, metadata.Creator, metadata.Date, metadata.Description, 
+                metadata.Title, metadata.Language,
+                metadata.Contributor, metadata.Coverage, metadata.Creator, metadata.Date, metadata.Description,
                 metadata.Format, metadata.Publisher, metadata.Relation, metadata.Rights, metadata.Source, metadata.Subject,
                 metadata.Type
             ).Cast<object>().ToArray());

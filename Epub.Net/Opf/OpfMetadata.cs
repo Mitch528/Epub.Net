@@ -9,11 +9,11 @@ namespace Epub.Net.Opf
 {
     public class OpfMetadata
     {
-        public string Identifier { get; set; } = StringUtilities.GenerateRandomString();
+        public OpfMetadataElement Identifier { get; set; } = new OpfMetadataElement("identifier") { Text = StringUtilities.GenerateRandomString() };
 
-        public string Title { get; set; }
+        public OpfMetadataElement Title { get; set; } = new OpfMetadataElement("title");
 
-        public string Language { get; set; }
+        public OpfMetadataElement Language { get; set; } = new OpfMetadataElement("language");
 
         public OpfMetadataElement Contributor { get; set; } = new OpfMetadataElement("contributor");
 

@@ -37,7 +37,14 @@ namespace Epub.Net
 
         public string Title { get; set; }
 
+        public string Description { get; set; }
+
+        public string Creator { get; set; }
+
+        public string Publisher { get; set; }
+
         public string CoverImage { get; set; }
+
 
         public List<Chapter> Chapters { get; }
 
@@ -70,8 +77,11 @@ namespace Epub.Net
         {
             OpfFile opf = new OpfFile(new OpfMetadata
             {
-                Title = Title,
-                Language = Language
+                Title = { Text = Title },
+                Language = { Text = Language },
+                Description = { Text = Description },
+                Creator = { Text = Creator },
+                Publisher = { Text = Publisher }
             });
 
             string tmpDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
