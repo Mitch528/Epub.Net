@@ -113,24 +113,29 @@ namespace Epub.Net
                 string coverImgFile = Path.GetFileName(CoverImage);
                 string coverImg = Path.Combine("covers", coverImgFile);
 
-                if (!new Uri(CoverImage).IsFile)
-                    using (WebClient wc = new WebClient())
-                        wc.DownloadFile(CoverImage, Path.Combine(epub, coverImg));
-                else if (File.Exists(CoverImage))
-                    File.Copy(CoverImage, Path.Combine(epub, coverImg));
+                Uri coverImgUri;
 
-                OpfItem coverImageItem = new OpfItem(coverImg.Replace(@"\", "/"), Path.GetFileNameWithoutExtension(coverImg), mType)
+                if (Uri.TryCreate(CoverImage, UriKind.RelativeOrAbsolute, out coverImgUri))
                 {
-                    Linear = false,
-                    Properties = "cover-image"
-                };
+                    if (!coverImgUri.IsFile)
+                        using (WebClient wc = new WebClient())
+                            await wc.DownloadFileTaskAsync(CoverImage, Path.Combine(epub, coverImg));
+                    else if (File.Exists(CoverImage))
+                        File.Copy(CoverImage, Path.Combine(epub, coverImg));
 
-                OpfItem coverItem = new OpfItem("cover.xhtml", "cover", MediaType.XHtmlType);
-                File.WriteAllText(Path.Combine(epub, "cover.xhtml"),
-                    RazorCompiler.Get(Templates[EBookTemplate.Cover], "cover", $"covers/{coverImgFile}"));
+                    OpfItem coverImageItem = new OpfItem(coverImg.Replace(@"\", "/"), Path.GetFileNameWithoutExtension(coverImg), mType)
+                    {
+                        Linear = false,
+                        Properties = "cover-image"
+                    };
 
-                opf.AddItem(coverItem);
-                opf.AddItem(coverImageItem, false);
+                    OpfItem coverItem = new OpfItem("cover.xhtml", "cover", MediaType.XHtmlType);
+                    File.WriteAllText(Path.Combine(epub, "cover.xhtml"),
+                        RazorCompiler.Get(Templates[EBookTemplate.Cover], "cover", $"covers/{coverImgFile}"));
+
+                    opf.AddItem(coverItem);
+                    opf.AddItem(coverImageItem, false);
+                }
             }
 
             TableOfContents toc = new TableOfContents { Title = Title };
@@ -193,22 +198,13 @@ namespace Epub.Net
                 tasks.Add(Task.Run(async () =>
                 {
                     string src = img.GetAttribute("src");
-                    string fileName = Path.GetFileNameWithoutExtension(src)?.ReplaceInvalidChars();
+                    string fileName = $"{Path.GetRandomFileName()}.{Path.GetExtension(src)}";
 
                     if (string.IsNullOrEmpty(fileName))
                         return;
 
-                    string fileExt = Path.GetExtension(fileName);
-                    fileName += fileExt;
-
-                    if (fileName.HasInvalidPathChars())
-                        fileName = fileName.ToValidFilePath();
-
                     string path = Path.Combine(outputDir, fileName);
-
-                    if (File.Exists(path))
-                        return;
-
+                    
                     Uri uri;
                     if (!Uri.TryCreate(src, UriKind.RelativeOrAbsolute, out uri))
                         return;
@@ -219,7 +215,7 @@ namespace Epub.Net
                         {
                             using (HttpClient client = new HttpClient())
                             {
-                                HttpResponseMessage resp = client.GetAsync(src).Result;
+                                HttpResponseMessage resp = await client.GetAsync(src);
                                 resp.EnsureSuccessStatusCode();
 
                                 string mediaType = resp.Content.Headers.ContentType.MediaType.ToLower();
