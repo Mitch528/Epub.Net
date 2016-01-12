@@ -134,10 +134,6 @@ namespace Epub.Net
             }
 
             TableOfContents toc = new TableOfContents { Title = Title };
-            toc.Sections.AddRange(Chapters.Select(p => new Section { Name = p.Name, Href = p.FileName }));
-
-            string tocFile = Path.Combine(epub, "toc.xhtml");
-            File.WriteAllText(tocFile, RazorCompiler.Get(Templates[EBookTemplate.TableOfContents], "toc", toc));
 
             OpfItem navItem = new OpfItem("toc.xhtml", "toc", MediaType.XHtmlType) { Properties = "nav" };
             opf.AddItem(navItem);
@@ -153,12 +149,23 @@ namespace Epub.Net
                 else
                     chapter.Content = doc.QuerySelector("body").ChildNodes.ToHtml(new XmlMarkupFormatter());
 
-                OpfItem item = new OpfItem(chapter.FileName, chapter.Name.ReplaceInvalidChars(), MediaType.XHtmlType);
+                string randomFile = Path.GetRandomFileName() + ".xhtml";
+
+                OpfItem item = new OpfItem(randomFile, StringUtilities.GenerateRandomString(6), MediaType.XHtmlType);
                 opf.AddItem(item);
 
-                File.WriteAllText(Path.Combine(epub, chapter.FileName),
+                File.WriteAllText(Path.Combine(epub, randomFile),
                         RazorCompiler.Get(Templates[EBookTemplate.Chapter], "chapter", chapter));
+
+                toc.Sections.Add(new Section
+                {
+                    Name = chapter.Name,
+                    Href = randomFile
+                });
             }
+
+            string tocFile = Path.Combine(epub, "toc.xhtml");
+            File.WriteAllText(tocFile, RazorCompiler.Get(Templates[EBookTemplate.TableOfContents], "toc", toc));
 
             opf.Save(Path.Combine(epub, "package.opf"));
 
