@@ -192,24 +192,46 @@ namespace Epub.Net
         protected virtual async Task EmbedImagesAsync(IHtmlDocument doc, OpfFile opfFile, Chapter chapter, string outputDir)
         {
             var tasks = new List<Task>();
+            var images = new Dictionary<Uri, string>();
 
             foreach (var img in doc.QuerySelectorAll("img"))
             {
+                string src = img.GetAttribute("src");
+                if (src.StartsWith("//"))
+                {
+                    src = src.Substring(2);
+
+                    if (!(src.StartsWith("http://") || src.StartsWith("https://")))
+                        src = "http://" + src;
+                }
+
+                string fileName = $"{Path.GetRandomFileName()}.{Path.GetExtension(src)}";
+
+                if (string.IsNullOrEmpty(fileName))
+                    return;
+
+                string path = Path.Combine(outputDir, fileName);
+
+                Uri uri;
+                if (!Uri.TryCreate(src, UriKind.RelativeOrAbsolute, out uri))
+                    continue;
+
+                if (!images.ContainsKey(uri))
+                    images.Add(uri, path);
+
+                string filePath = Path.Combine(new DirectoryInfo(outputDir).Name, Path.GetFileName(path)).Replace(@"\", "/");
+                img.SetAttribute("src", filePath);
+            }
+
+            foreach (var img in images)
+            {
                 tasks.Add(Task.Run(async () =>
                 {
-                    string src = img.GetAttribute("src");
-                    string fileName = $"{Path.GetRandomFileName()}.{Path.GetExtension(src)}";
+                    Uri uri = img.Key;
+                    string path = img.Value;
+                    string src = uri.ToString();
 
-                    if (string.IsNullOrEmpty(fileName))
-                        return;
-
-                    string path = Path.Combine(outputDir, fileName);
-                    
-                    Uri uri;
-                    if (!Uri.TryCreate(src, UriKind.RelativeOrAbsolute, out uri))
-                        return;
-
-                    if (!uri.IsFile)
+                    if (uri.IsAbsoluteUri && !uri.IsFile)
                     {
                         try
                         {
@@ -253,10 +275,7 @@ namespace Epub.Net
                     if (mType == null)
                         return;
 
-                    string filePath = Path.Combine(new DirectoryInfo(outputDir).Name, Path.GetFileName(path)).Replace(@"\", "/");
-                    img.SetAttribute("src", filePath);
-
-                    opfFile.AddItem(new OpfItem(filePath, StringUtilities.GenerateRandomString(),
+                    opfFile.AddItem(new OpfItem(path, StringUtilities.GenerateRandomString(),
                         mType), false);
                 }));
             }
