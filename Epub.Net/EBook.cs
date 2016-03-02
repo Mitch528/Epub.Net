@@ -205,16 +205,19 @@ namespace Epub.Net
                         src = "http://" + src;
                 }
 
-                string fileName = $"{Path.GetRandomFileName()}.{Path.GetExtension(src)}";
+                Uri uri;
+                if (!Uri.TryCreate(src, UriKind.RelativeOrAbsolute, out uri))
+                    continue;
+
+                UriBuilder ub = new UriBuilder(uri) { Query = string.Empty };
+                uri = ub.Uri;
+
+                string fileName = $"{Path.GetRandomFileName()}.{Path.GetExtension(uri.ToString())}".ToValidFilePath();
 
                 if (string.IsNullOrEmpty(fileName))
                     return;
 
                 string path = Path.Combine(outputDir, fileName);
-
-                Uri uri;
-                if (!Uri.TryCreate(src, UriKind.RelativeOrAbsolute, out uri))
-                    continue;
 
                 if (!images.ContainsKey(uri))
                     images.Add(uri, path);
@@ -229,8 +232,9 @@ namespace Epub.Net
                 {
                     Uri uri = img.Key;
                     string path = img.Value;
+                    string outputPath = Path.Combine(new DirectoryInfo(outputDir).Name, Path.GetFileName(path)).Replace(@"\", "/");
                     string src = uri.ToString();
-
+                    
                     if (uri.IsAbsoluteUri && !uri.IsFile)
                     {
                         try
@@ -241,17 +245,9 @@ namespace Epub.Net
                                 resp.EnsureSuccessStatusCode();
 
                                 string mediaType = resp.Content.Headers.ContentType.MediaType.ToLower();
-                                string ext;
 
-                                if (mediaType == MediaType.JpegType)
-                                    ext = ".jpg";
-                                else if (mediaType == MediaType.PngType)
-                                    ext = ".png";
-                                else
+                                if (mediaType != MediaType.JpegType && mediaType != MediaType.PngType)
                                     return;
-
-                                if (Path.GetExtension(path) != ext)
-                                    path = path + ext;
 
                                 if (File.Exists(path))
                                     return;
@@ -275,7 +271,7 @@ namespace Epub.Net
                     if (mType == null)
                         return;
 
-                    opfFile.AddItem(new OpfItem(path, StringUtilities.GenerateRandomString(),
+                    opfFile.AddItem(new OpfItem(outputPath, StringUtilities.GenerateRandomString(),
                         mType), false);
                 }));
             }
